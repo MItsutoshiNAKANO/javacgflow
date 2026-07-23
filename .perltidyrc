@@ -1,0 +1,7 @@
+# @file
+# @brief The perltidy format file
+
+# Style
+# @see https://metacpan.org/dist/Perl-Tidy/view/bin/perltidy
+--perl-best-practices
+--extended-continuation-indentation
