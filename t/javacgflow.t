@@ -212,6 +212,80 @@ subtest 'main (end to end)' => sub {
     return;
 };
 
+subtest 'main: error handling' => sub {
+    my $file = fixture_file('M:pkg.A:foo() (M)pkg.B:bar()');
+
+    subtest 'invalid filter regex' => sub {
+        local @ARGV = ( '-f', '(', $file );
+        my $ok = eval { main(); 1 };
+        ok( !$ok, 'main() dies' );
+        like(
+            $EVAL_ERROR,
+            qr/\Ainvalid \s filter \s regex:/xms,
+            'dies with a diagnostic naming the bad -f regex'
+        );
+        return;
+    };
+
+    subtest 'invalid start regex' => sub {
+        local @ARGV = ( '-s', '(', $file );
+        my $ok = eval { main(); 1 };
+        ok( !$ok, 'main() dies' );
+        like(
+            $EVAL_ERROR,
+            qr/\Ainvalid \s start \s regex:/xms,
+            'dies with a diagnostic naming the bad -s regex'
+        );
+        return;
+    };
+
+    subtest 'unknown option' => sub {
+        local @ARGV = ( '-z', $file );
+        my $ok = eval { main(); 1 };
+        ok( !$ok, 'main() dies' );
+        like( $EVAL_ERROR, qr/\AUsage:/xms,
+            'dies with the help message' );
+        return;
+    };
+
+    return;
+};
+
+subtest 'main: --help and --version' => sub {
+    my $script = "$Bin/../javacgflow.pl";
+
+    subtest '--help' => sub {
+        ## no critic (InputOutput::ProhibitBacktickOperators)
+        my $out = qx{$EXECUTABLE_NAME $script --help 2>/dev/null};
+        ## use critic
+        is( $CHILD_ERROR, 0, 'exits successfully' );
+        like(
+            $out,
+            qr/javacgflow[.]pl \s version/xms,
+            'prints the Getopt::Std diagnostic banner'
+        );
+        like( $out, qr/Usage:/xms, 'prints the usage message' );
+        return;
+    };
+
+    subtest '--version' => sub {
+        ## no critic (InputOutput::ProhibitBacktickOperators)
+        my $out = qx{$EXECUTABLE_NAME $script --version 2>/dev/null};
+        ## use critic
+        is( $CHILD_ERROR, 0, 'exits successfully' );
+        like(
+            $out,
+            qr/javacgflow[.]pl \s version \s $VERSION/xms,
+            'prints the version banner'
+        );
+        unlike( $out, qr/Usage:/xms,
+            'does not also print the usage message' );
+        return;
+    };
+
+    return;
+};
+
 subtest 'regression: no two callees of the same caller share a rank' => sub {
     local @ARGV = ("$Bin/commons-cli.javacg-static");
     my $state = load_javacg_static(undef);
