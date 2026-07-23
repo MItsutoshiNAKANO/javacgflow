@@ -114,27 +114,29 @@ sub load_javacg_static {
 # @param[in] $depth
 #   The current depth of the search, used for indentation.
 # @param[in,out] $visited
-#   A hash reference to keep track of visited methods to avoid infinite recursion.
+#   A hash reference tracking the ancestors on the current path, to detect
+#   recursion. Mutated in place rather than copied, and restored to its
+#   original contents before returning.
 # @return None.
 sub depth_first_search {
-    my ( $edges, $method, $depth, $visited_methods ) = @_;
+    my ( $edges, $method, $depth, $visited ) = @_;
     print q{  } x $depth . $method
         or croak $OS_ERROR . q{, so couldn't print the flow};
-    my %visited = %{$visited_methods};
-    if ( exists $visited{$method} ) {
+    if ( exists $visited->{$method} ) {
         say '(recursive)'
             or croak $OS_ERROR . q{, so couldn't print the flow};
         return $method . ' (recursive)';
     }
     say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
-    ++$visited{$method};
+    ++$visited->{$method};
     for my $callee (
         sort { $edges->{$method}{$a} <=> $edges->{$method}{$b} }
         keys %{ $edges->{$method} }
         )
     {
-        depth_first_search( $edges, $callee, $depth + 1, \%visited );
+        depth_first_search( $edges, $callee, $depth + 1, $visited );
     }
+    delete $visited->{$method};
     return $method;
 }
 

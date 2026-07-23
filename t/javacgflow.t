@@ -158,7 +158,8 @@ subtest 'depth_first_search' => sub {
         'indents by depth, visits callees in rank order, and marks a cycle back to an ancestor as recursive'
     );
     is_deeply( \%visited, {},
-        q{caller's own %visited copy is left untouched} );
+        'the ancestor-tracking hash is restored to its original contents after the traversal completes'
+    );
 
     return;
 };
