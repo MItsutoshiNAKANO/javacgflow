@@ -195,11 +195,11 @@ __END__
 
 =head1 NAME
 
-javacgflow.pl - Convert Java call graph to Graphviz DOT format
+javacgflow.pl - Convert Java call graph to Cflow-like text format
 
 =head1 SYNOPSIS
 
-    javacgflow.pl [OPTIONS] TARGET.javacg-static ... >TARGET.dot
+    javacgflow.pl [OPTIONS] TARGET.javacg-static ... >TARGET.flow
     Options:
         -f REGEX Specify a filter regex.
         -s REGEX Specify the start method.
