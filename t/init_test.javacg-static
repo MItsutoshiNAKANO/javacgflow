@@ -1,0 +1,3 @@
+M:org.example.Foo:<init>(java.lang.String) (M)org.example.Bar:helper()
+M:org.example.Foo:<clinit>() (S)org.example.Baz:init()
+M:org.example.Foo:bar() (M)java.lang.String:trim()

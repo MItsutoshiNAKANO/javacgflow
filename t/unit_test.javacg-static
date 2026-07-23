@@ -1,0 +1,4 @@
+M:class1:method1() (M)class2:method2()
+M:class1:method1() (M)class3:method3()
+M:class2:method2() (M)class3:method3()
+M:class2:method2a() (M)class3:method3()
