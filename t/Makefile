@@ -2,7 +2,7 @@
 
 TARGETS=unit_test.flow init_test.flow commons-cli.flow
 TARGETS2=$(TARGETS:.flow=.2.flow)
-.PHONY: all check test clean
+.PHONY: all check test clean FORCE
 
 all: check
 check: test $(TARGETS) $(TARGETS2)
@@ -15,7 +15,7 @@ test:
 clean:
 	rm -f $(TARGETS) $(TARGETS2)
 
-%.flow: %.javacg-static
+%.flow: %.javacg-static FORCE
 	../javacgflow.pl $< >$@
-%.2.flow: %.javacg-static
+%.2.flow: %.javacg-static FORCE
 	../javacgflow.pl $< >$@
