@@ -6,7 +6,7 @@ TARGETS2=$(TARGETS:.flow=.2.flow)
 
 all: check
 check: test $(TARGETS) $(TARGETS2)
-	for f in $(TARGETS:.flow=); do \
+	set -e; for f in $(TARGETS:.flow=); do \
 		diff -u $$f.flow $$f.2.flow; \
 	done
 test:
