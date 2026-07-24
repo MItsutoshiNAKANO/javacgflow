@@ -9,6 +9,7 @@
         "Graphviz",
         "javacg",
         "javacgflow",
+        "libperl",
         "perlcritic",
         "perldoc",
         "perltidy",
