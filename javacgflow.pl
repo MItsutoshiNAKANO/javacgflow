@@ -6,8 +6,16 @@ use Carp;
 use English qw(-no_match_vars);
 use Getopt::Std;
 
+##
+# The version of this script.
+# This is used for the --version option.
+# @return The version string.
 our $VERSION = '0.1.1';
 
+##
+# The help message string.
+# The help message is printed when the script is run with the --help option.
+# @return The help message string.
 my $help_message = <<"_END_OF_HELP_";
 Usage: $PROGRAM_NAME [OPTIONS] TARGET.javacg-static ...
 Convert Java call graph to Cflow like text.
@@ -39,6 +47,7 @@ _END_OF_HELP_
 
 ##
 # Print the help message.
+# @return The help message string.
 sub HELP_MESSAGE {
     print "$help_message"
         or croak $OS_ERROR . q{, so couldn't print the help message};
