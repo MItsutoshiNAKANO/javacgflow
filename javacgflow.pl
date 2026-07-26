@@ -147,12 +147,12 @@ sub depth_first_search {
     }
     say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
     ++$visited->{$method};
-    foreach my $callee (
+    foreach my $next_method (
         sort { $edges->{$method}{$a} <=> $edges->{$method}{$b} }
         keys %{ $edges->{$method} }
         )
     {
-        depth_first_search( $edges, $callee, $depth + 1, $visited );
+        depth_first_search( $edges, $next_method, $depth + 1, $visited );
     }
     delete $visited->{$method};
     return $method;
