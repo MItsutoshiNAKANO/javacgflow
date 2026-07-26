@@ -8,7 +8,7 @@ use File::Temp qw(tempfile);
 use FindBin    qw($Bin);
 use Test::More;
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.1.0';
 
 ## no critic (Modules::RequireBarewordIncludes)
 # javacgflow.pl is a script, not an installed module, so it cannot be
@@ -50,6 +50,7 @@ subtest 'HELP_MESSAGE' => sub {
     like( $out, qr/\AUsage:/xms,    'prints a usage line' );
     like( $out, qr/-f \s REGEX/xms, 'documents the -f option' );
     like( $out, qr/-s \s REGEX/xms, 'documents the -s option' );
+    like( $out, qr/-r \s Print/xms, 'documents the -r option' );
     return;
 };
 
@@ -79,7 +80,7 @@ subtest 'parse_call_line' => sub {
 };
 
 subtest 'record_edge' => sub {
-    my %state = ( edges => {}, called => {} );
+    my %state = ( edges => {}, called => {}, reversed_edges => {} );
 
     is( record_edge( \%state, 'C:caller()', 'X:first()' ),
         0, 'first edge from a caller is recorded with rank 0' );
@@ -95,6 +96,14 @@ subtest 'record_edge' => sub {
     is( $state{called}{'X:first()'},
         1,
         'a duplicate edge does not double-count the callee as called' );
+    is_deeply(
+        $state{reversed_edges},
+        {   'X:first()'  => { 'C:caller()' => 0 },
+            'Y:second()' => { 'C:caller()' => 0 },
+            'Z:third()'  => { 'C:caller()' => 0 },
+        },
+        'records the reverse edge from each callee back to its caller'
+    );
 
     return;
 };
@@ -123,6 +132,14 @@ subtest 'load_javacg_static' => sub {
             $state->{called},
             { 'pkg.B:bar()' => 1, 'pkg.C:baz()' => 2 },
             'counts how many times each callee is called'
+        );
+        is_deeply(
+            $state->{reversed_edges},
+            {   'pkg.B:bar()' => { 'pkg.A:foo()' => 0 },
+                'pkg.C:baz()' =>
+                    { 'pkg.A:foo()' => 0, 'pkg.B:bar()' => 1 },
+            },
+            'records every edge in reverse, callee to caller'
         );
         return;
     };
@@ -197,6 +214,43 @@ subtest 'print_flow' => sub {
     return;
 };
 
+subtest 'print_flow (reverse)' => sub {
+    my %state = (
+        edges => {
+            'A:a()' => { 'B:b()' => 0 },
+            'B:b()' => { 'C:c()' => 0 },
+        },
+        called         => { 'B:b()' => 1, 'C:c()' => 1 },
+        reversed_edges => {
+            'B:b()' => { 'A:a()' => 0 },
+            'C:c()' => { 'B:b()' => 0 },
+        },
+    );
+
+    subtest 'default: starts from methods that never call anything' =>
+        sub {
+            my $out
+            = capture_stdout( sub { print_flow( \%state, undef, 1 ) } );
+            is( $out,
+                "C:c()\n  B:b()\n    A:a()\n",
+            'walks callee to caller, starting from the leaf of the forward graph'
+            );
+            return;
+        };
+
+    subtest 'with a start regex' => sub {
+        my $out
+            = capture_stdout( sub { print_flow( \%state, qr/\AB/xms, 1 ) } );
+        is( $out,
+            "B:b()\n  A:a()\n",
+            'starts only from methods matching the regex'
+        );
+        return;
+    };
+
+    return;
+};
+
 subtest 'main (end to end)' => sub {
     my $file = fixture_file(
         'M:pkg.A:foo() (M)pkg.B:bar()',
@@ -208,6 +262,22 @@ subtest 'main (end to end)' => sub {
     is( $out,
         "pkg.A:foo()\n  pkg.B:bar()\n    pkg.C:baz()\n",
         'wires option parsing, loading, and printing together'
+    );
+
+    return;
+};
+
+subtest 'main (end to end, reverse)' => sub {
+    my $file = fixture_file(
+        'M:pkg.A:foo() (M)pkg.B:bar()',
+        'M:pkg.B:bar() (M)pkg.C:baz()',
+    );
+
+    local @ARGV = ( '-r', $file );
+    my $out = capture_stdout( sub { main() } );
+    is( $out,
+        "pkg.C:baz()\n  pkg.B:bar()\n    pkg.A:foo()\n",
+        'wires the -r option through to print the flow from callee to caller'
     );
 
     return;

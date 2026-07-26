@@ -6,7 +6,7 @@ use Carp;
 use English qw(-no_match_vars);
 use Getopt::Std;
 
-our $VERSION = '0.0.1';
+our $VERSION = '0.1.0';
 
 my $help_message = <<"_END_OF_HELP_";
 Usage: $PROGRAM_NAME [OPTIONS] TARGET.javacg-static ...
@@ -28,6 +28,7 @@ Options:
       REGEX modifiers are /xms by default, so you can use whitespace
       and comments in your regex, and the dot (.) matches any character.
     -s REGEX Specify the start method.
+    -r Print the flow from callee to caller (reverse direction).
 example:
     java -jar javacg-static.jar TARGET.jar >TARGET.javacg-static
     $PROGRAM_NAME -f example.package -s Servlet.doPost TARGET.javacg-static 
@@ -61,7 +62,8 @@ sub parse_call_line {
 }
 
 ##
-# Record the edge from caller to callee in the edges hash.
+# Record the edge from caller to callee in the edges hash, and the reverse
+# edge from callee to caller in the reversed_edges hash.
 # @param[out] $state
 #   A hash reference to store the state of the call graph.
 # @param[in] $caller
@@ -73,10 +75,13 @@ sub parse_call_line {
 #   > 0 if the edge was recorded successfully.
 sub record_edge {
     my ( $state, $caller, $callee ) = @_;
-    my $edges  = $state->{edges};
-    my $called = $state->{called};
+    my $edges          = $state->{edges};
+    my $called         = $state->{called};
+    my $reversed_edges = $state->{reversed_edges};
     if ( exists $edges->{$caller}{$callee} ) { return 0 }
     ++$called->{$callee};
+    $reversed_edges->{$callee}{$caller}
+        = keys %{ $reversed_edges->{$callee} };
     return $edges->{$caller}{$callee} = keys %{ $edges->{$caller} };
 }
 
@@ -88,8 +93,9 @@ sub record_edge {
 sub load_javacg_static {
     my ($filter_regex) = @_;
     my %state = (
-        edges  => {},
-        called => {}
+        edges          => {},
+        called         => {},
+        reversed_edges => {},
     );
 
     while (<>) {
@@ -141,9 +147,14 @@ sub depth_first_search {
 }
 
 sub print_flow {
-    my ( $state, $start_regex ) = @_;
-    my $edges  = $state->{edges};
-    my $called = $state->{called};
+    my ( $state, $start_regex, $reverse ) = @_;
+
+    # In reverse mode, walk reversed_edges (callee -> caller) instead of
+    # edges (caller -> callee). The default starting points then become
+    # methods that never call anything (leaves of the forward graph),
+    # so $anchor swaps from "called" to "edges" to test for that.
+    my $edges  = $reverse ? $state->{reversed_edges} : $state->{edges};
+    my $anchor = $reverse ? $state->{edges}          : $state->{called};
 
     my @starts;
 
@@ -154,7 +165,7 @@ sub print_flow {
     }
     else {
         for my $method ( sort { $a cmp $b } keys %{$edges} ) {
-            if ( !exists $called->{$method} ) { push @starts, $method }
+            if ( !exists $anchor->{$method} ) { push @starts, $method }
         }
     }
 
@@ -170,7 +181,7 @@ sub print_flow {
 # @return 1 if the script executed successfully, otherwise croak.
 sub main {
     $Getopt::Std::STANDARD_HELP_VERSION = 1;
-    getopts( 'f:s:', \my %opts ) or croak $help_message;
+    getopts( 'f:s:r', \my %opts ) or croak $help_message;
     my $start_regex;
     if ( defined $opts{s} ) {
         eval { $start_regex = qr/$opts{s}/xms }
@@ -184,7 +195,7 @@ sub main {
 
     my $state = load_javacg_static($filter_regex);
 
-    return print_flow( $state, $start_regex );
+    return print_flow( $state, $start_regex, $opts{r} );
 }
 
 if ( !caller ) { main() }
@@ -205,6 +216,7 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     Options:
         -f REGEX Specify a filter regex.
         -s REGEX Specify the start method.
+        -r Print the flow from callee to caller (reverse direction).
         --help Print a brief help message and exit.
         --version Print the version number and exit.
 
@@ -249,6 +261,14 @@ Specify a Perl regular expression to select the start method for the call
 flow.
 Only methods matching this regex will be used as starting points in the call
 graph.
+
+=item * C<-r> Print the flow from callee to caller (reverse direction).
+
+By default the flow is printed from caller to callee, starting from methods
+that are never called by another method. With C<-r>, the flow is inverted:
+it is printed from callee to caller, starting from methods that never call
+another method, and each indented line shows a method's callers instead of
+its callees.
 
 =item * C<--help> Print a brief help message and exit.
 
