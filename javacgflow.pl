@@ -47,11 +47,12 @@ _END_OF_HELP_
 
 ##
 # Print the help message.
-# @return The help message string.
+# @return 1 if the help message was printed successfully, otherwise croak.
 sub HELP_MESSAGE {
-    print "$help_message"
-        or croak $OS_ERROR . q{, so couldn't print the help message};
-    return $help_message;
+    return print "$help_message"
+        or croak $OS_ERROR
+        . qq{, so couldn't print the help message:\n}
+        . $help_message;
 }
 
 ##
