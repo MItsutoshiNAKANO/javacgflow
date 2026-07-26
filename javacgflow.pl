@@ -55,7 +55,7 @@ sub parse_call_line {
     my ($line) = @_;
     if ( $line =~ /\A M:(\S+:\S+)\s+ [(].[)](\S+:\S+)/xms ) {
         my ( $caller, $callee ) = ( $1, $2 );
-        return if $callee =~ m/\Ajavax?[.]/xms;
+        return if $callee =~ m/\A javax?[.]/xms;
         return ( $caller, $callee );
     }
     return;
