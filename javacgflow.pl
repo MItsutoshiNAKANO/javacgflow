@@ -16,7 +16,7 @@ our $VERSION = '0.1.1';
 # The help message string.
 # The help message is printed when the script is run with the --help option.
 # @return The help message string.
-my $help_message = <<"_END_OF_HELP_";
+my $Help_Message = <<"_END_OF_HELP_";
 Usage: $PROGRAM_NAME [OPTIONS] TARGET.javacg-static ...
 Convert Java call graph to Cflow like text.
 Options:
@@ -49,10 +49,10 @@ _END_OF_HELP_
 # Print the help message.
 # @return 1 if the help message was printed successfully, otherwise croak.
 sub HELP_MESSAGE {
-    return print "$help_message"
+    return print "$Help_Message"
         or croak $OS_ERROR
         . qq{, so couldn't print the help message:\n}
-        . $help_message;
+        . $Help_Message;
 }
 
 ##
@@ -203,7 +203,7 @@ sub print_flow {
 # @return 1 if the script executed successfully, otherwise croak.
 sub main {
     $Getopt::Std::STANDARD_HELP_VERSION = 1;
-    getopts( 'f:s:r', \my %opts ) or croak $help_message;
+    getopts( 'f:s:r', \my %opts ) or croak $Help_Message;
     my $start_regex;
     if ( defined $opts{s} ) {
         eval { $start_regex = qr/$opts{s}/xms }
