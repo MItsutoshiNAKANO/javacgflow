@@ -146,7 +146,7 @@ sub depth_first_search {
     }
     say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
     ++$visited->{$method};
-    for my $callee (
+    foreach my $callee (
         sort { $edges->{$method}{$a} <=> $edges->{$method}{$b} }
         keys %{ $edges->{$method} }
         )
