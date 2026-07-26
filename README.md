@@ -8,6 +8,7 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     Options:
         -f REGEX Specify a filter regex.
         -s REGEX Specify the start method.
+        -r Print the flow from callee to caller (reverse direction).
         --help Print a brief help message and exit.
         --version Print the version number and exit.
 
@@ -46,6 +47,14 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     flow.
     Only methods matching this regex will be used as starting points in the call
     graph.
+
+- `-r` Print the flow from callee to caller (reverse direction).
+
+    By default the flow is printed from caller to callee, starting from methods
+    that are never called by another method. With `-r`, the flow is inverted:
+    it is printed from callee to caller, starting from methods that never call
+    another method, and each indented line shows a method's callers instead of
+    its callees.
 
 - `--help` Print a brief help message and exit.
 - `--version` Print the version number and exit.

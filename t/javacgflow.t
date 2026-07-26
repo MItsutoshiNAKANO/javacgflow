@@ -8,7 +8,7 @@ use File::Temp qw(tempfile);
 use FindBin    qw($Bin);
 use Test::More;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 ## no critic (Modules::RequireBarewordIncludes)
 # javacgflow.pl is a script, not an installed module, so it cannot be
@@ -83,24 +83,26 @@ subtest 'record_edge' => sub {
     my %state = ( edges => {}, called => {}, reversed_edges => {} );
 
     is( record_edge( \%state, 'C:caller()', 'X:first()' ),
-        0, 'first edge from a caller is recorded with rank 0' );
+        1, 'first edge from a caller is recorded with rank 1' );
     is( record_edge( \%state, 'C:caller()', 'Y:second()' ),
-        1, 'second edge from the same caller gets the next rank' );
+        2, 'second edge from the same caller gets the next rank' );
     is( record_edge( \%state, 'C:caller()', 'X:first()' ),
         0, 'recording the same edge again reports it as already known' );
-    is( $state{edges}{'C:caller()'}{'X:first()'}, 0,
-        'regression: re-recording the rank-0 edge must not overwrite its rank'
+    is( $state{edges}{'C:caller()'}{'X:first()'}, 1,
+        'regression: re-recording the rank-1 edge must not overwrite its rank'
     );
+    ## no critic (ValuesAndExpressions::ProhibitMagicNumbers)
     is( record_edge( \%state, 'C:caller()', 'Z:third()' ),
-        2, 'regression: the next new edge must not collide with rank 0' );
+        3, 'regression: the next new edge must not collide with rank 1' );
+    ## use critic
     is( $state{called}{'X:first()'},
         1,
         'a duplicate edge does not double-count the callee as called' );
     is_deeply(
         $state{reversed_edges},
-        {   'X:first()'  => { 'C:caller()' => 0 },
-            'Y:second()' => { 'C:caller()' => 0 },
-            'Z:third()'  => { 'C:caller()' => 0 },
+        {   'X:first()'  => { 'C:caller()' => 1 },
+            'Y:second()' => { 'C:caller()' => 1 },
+            'Z:third()'  => { 'C:caller()' => 1 },
         },
         'records the reverse edge from each callee back to its caller'
     );
@@ -123,8 +125,8 @@ subtest 'load_javacg_static' => sub {
         is_deeply(
             $state->{edges},
             {   'pkg.A:foo()' =>
-                    { 'pkg.B:bar()' => 0, 'pkg.C:baz()' => 1 },
-                'pkg.B:bar()' => { 'pkg.C:baz()' => 0 },
+                    { 'pkg.B:bar()' => 1, 'pkg.C:baz()' => 2 },
+                'pkg.B:bar()' => { 'pkg.C:baz()' => 1 },
             },
             'records every edge in call order, skipping invalid and java.* lines'
         );
@@ -135,9 +137,9 @@ subtest 'load_javacg_static' => sub {
         );
         is_deeply(
             $state->{reversed_edges},
-            {   'pkg.B:bar()' => { 'pkg.A:foo()' => 0 },
+            {   'pkg.B:bar()' => { 'pkg.A:foo()' => 1 },
                 'pkg.C:baz()' =>
-                    { 'pkg.A:foo()' => 0, 'pkg.B:bar()' => 1 },
+                    { 'pkg.A:foo()' => 1, 'pkg.B:bar()' => 2 },
             },
             'records every edge in reverse, callee to caller'
         );
@@ -149,8 +151,8 @@ subtest 'load_javacg_static' => sub {
         my $state = load_javacg_static(qr/pkg[.]B/xms);
         is_deeply(
             $state->{edges},
-            {   'pkg.A:foo()' => { 'pkg.B:bar()' => 0 },
-                'pkg.B:bar()' => { 'pkg.C:baz()' => 0 },
+            {   'pkg.A:foo()' => { 'pkg.B:bar()' => 1 },
+                'pkg.B:bar()' => { 'pkg.C:baz()' => 1 },
             },
             'keeps only lines where the caller or callee matches the filter'
         );

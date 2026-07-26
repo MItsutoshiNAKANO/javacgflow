@@ -6,7 +6,7 @@ use Carp;
 use English qw(-no_match_vars);
 use Getopt::Std;
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 my $help_message = <<"_END_OF_HELP_";
 Usage: $PROGRAM_NAME [OPTIONS] TARGET.javacg-static ...
@@ -81,8 +81,8 @@ sub record_edge {
     if ( exists $edges->{$caller}{$callee} ) { return 0 }
     ++$called->{$callee};
     $reversed_edges->{$callee}{$caller}
-        = keys %{ $reversed_edges->{$callee} };
-    return $edges->{$caller}{$callee} = keys %{ $edges->{$caller} };
+        = ( keys %{ $reversed_edges->{$callee} } ) + 1;
+    return $edges->{$caller}{$callee} = ( keys %{ $edges->{$caller} } ) + 1;
 }
 
 ##
