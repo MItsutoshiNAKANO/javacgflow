@@ -31,7 +31,7 @@ Options:
     -r Print the flow from callee to caller (reverse direction).
 example:
     java -jar javacg-static.jar TARGET.jar >TARGET.javacg-static
-    $PROGRAM_NAME -f example.package -s Servlet.doPost TARGET.javacg-static 
+    $PROGRAM_NAME -f example.package -s Servlet.doPost TARGET.javacg-static
 
 For more details run
     perldoc -F $PROGRAM_NAME
@@ -123,7 +123,9 @@ sub load_javacg_static {
 #   A hash reference tracking the ancestors on the current path, to detect
 #   recursion. Mutated in place rather than copied, and restored to its
 #   original contents before returning.
-# @return None.
+# @return
+#   The method string, possibly annotated with ' (recursive)' if recursion is
+#   detected.
 sub depth_first_search {
     my ( $edges, $method, $depth, $visited ) = @_;
     print q{  } x $depth . $method
@@ -146,6 +148,16 @@ sub depth_first_search {
     return $method;
 }
 
+##
+# Print the call flow starting from the specified methods.
+# @param[in] $state
+#   A hash reference containing the state of the call graph.
+# @param[in] $start_regex
+#   An optional regex to filter the starting methods.
+# @param[in] $reverse
+#   A boolean indicating whether to print the flow in reverse
+#   (callee to caller).
+# @return 1 if the flow was printed successfully, otherwise croak.
 sub print_flow {
     my ( $state, $start_regex, $reverse ) = @_;
 
