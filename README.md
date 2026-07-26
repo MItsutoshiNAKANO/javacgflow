@@ -86,7 +86,7 @@ Cflow-like text format.
 
     The script couldn't print due to output error.
 
-- `, so couldn't print the help message`
+- `, so couldn't print the help message:`
 
     The script couldn't print the help message due to output error.
 

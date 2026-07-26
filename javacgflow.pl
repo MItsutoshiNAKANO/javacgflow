@@ -16,7 +16,7 @@ our $VERSION = '0.1.1';
 # The help message string.
 # The help message is printed when the script is run with the --help option.
 # @return The help message string.
-my $Help_Message = <<"_END_OF_HELP_";
+my $help_message = <<"_END_OF_HELP_";
 Usage: $PROGRAM_NAME [OPTIONS] TARGET.javacg-static ...
 Convert Java call graph to Cflow like text.
 Options:
@@ -49,10 +49,10 @@ _END_OF_HELP_
 # Print the help message.
 # @return 1 if the help message was printed successfully, otherwise croak.
 sub HELP_MESSAGE {
-    return print "$Help_Message"
+    return print "$help_message"
         or croak $OS_ERROR
         . qq{, so couldn't print the help message:\n}
-        . $Help_Message;
+        . $help_message;
 }
 
 ##
@@ -72,10 +72,23 @@ sub parse_call_line {
 }
 
 ##
+# Record a call edge from caller to callee in the state hash.
 # Record the edge from caller to callee in the edges hash, and the reverse
 # edge from callee to caller in the reversed_edges hash.
 # @param[out] $state
 #   A hash reference to store the state of the call graph.
+#   The hash contains the following keys:
+#   - edges: A hash reference to store the edges from caller to callee.
+#     The keys are the caller method strings, and the values are hash
+#     references where the keys are the callee method strings and the values
+#     are the count of times the edge was recorded.
+#   - called: A hash reference to store the count of times each method is
+#     called.
+#   - reversed_edges: A hash reference to store the edges from callee to
+#     caller.
+#     The keys are the callee method strings, and the values are hash
+#     references where the keys are the caller method strings and the values
+#     are the count of times the edge was recorded.
 # @param[in] $caller
 #   The caller method string in the format of javacg-static output.
 # @param[in] $callee
@@ -88,6 +101,7 @@ sub record_edge {
     my $edges          = $state->{edges};
     my $called         = $state->{called};
     my $reversed_edges = $state->{reversed_edges};
+
     if ( exists $edges->{$caller}{$callee} ) { return 0 }
     ++$called->{$callee};
     $reversed_edges->{$callee}{$caller}
@@ -102,6 +116,10 @@ sub record_edge {
 # @return A hash reference containing the state of the call graph.
 sub load_javacg_static {
     my ($filter_regex) = @_;
+    ## The state hash contains the edges, called, and reversed_edges hashes.
+    # The edges hash stores the edges from caller to callee.
+    # The called hash stores the count of times each method is called.
+    # The reversed_edges hash stores the edges from callee to caller.
     my %state = (
         edges          => {},
         called         => {},
@@ -110,6 +128,7 @@ sub load_javacg_static {
 
     while (<>) {
         chomp;
+        ## Parse the line and get the caller and callee methods.
         my ( $caller, $callee ) = parse_call_line($_);
         next if !defined $caller;
         next
@@ -178,6 +197,10 @@ sub print_flow {
     my $edges  = $reverse ? $state->{reversed_edges} : $state->{edges};
     my $anchor = $reverse ? $state->{edges}          : $state->{called};
 
+    ## Determine the starting methods for the call flow.
+    # If a start regex is provided, use it to filter the starting methods.
+    # Otherwise, use methods that are not called by any other method
+    # (or do not call any other method in reverse mode).
     my @starts;
 
     if ( defined $start_regex ) {
@@ -191,7 +214,13 @@ sub print_flow {
         }
     }
 
+    ## Print the call flow starting from each of the starting methods.
+    # Use a hash to track printed methods to avoid duplicate printing.
     foreach my $start (@starts) {
+        ## A hash to track printed methods to avoid duplicate printing.
+        # This is used to prevent printing the same method multiple times in
+        # the flow.
+        # The keys are the method strings, and the values are 1.
         my %printed;
         depth_first_search( $edges, $start, 0, \%printed );
     }
@@ -200,21 +229,38 @@ sub print_flow {
 
 ##
 # Main function to execute the script.
+# Parse command-line options using Getopt::Std.
 # @return 1 if the script executed successfully, otherwise croak.
 sub main {
     $Getopt::Std::STANDARD_HELP_VERSION = 1;
-    getopts( 'f:s:r', \my %opts ) or croak $Help_Message;
+    ## The options are stored in the %opts hash.
+    getopts( 'f:s:r', \my %opts ) or croak $help_message;
+
+    ## Compile the start and filter regexes if provided, and handle errors.
+    # The start regex is used to filter the starting methods for the call
+    # flow.
     my $start_regex;
     if ( defined $opts{s} ) {
         eval { $start_regex = qr/$opts{s}/xms }
             or croak 'invalid start regex: ' . $opts{s} . "\n" . $EVAL_ERROR;
     }
+
+    ## Compile the filter regex if provided, and handle errors.
+    # The filter regex is used to filter the methods to be included in the
+    # output.
     my $filter_regex;
     if ( defined $opts{f} ) {
         eval { $filter_regex = qr/$opts{f}/xms }
             or croak 'invalid filter regex: ' . $opts{f} . "\n" . $EVAL_ERROR;
     }
 
+    ## Load the javacg-static output and build the state of the call graph.
+    # The state contains the edges, called, and reversed_edges hashes.
+    # The edges hash stores the edges from caller to callee.
+    # The called hash stores the count of times each method is called.
+    # The reversed_edges hash stores the edges from callee to caller.
+    # The state is then used to print the call flow starting from the
+    # specified methods.
     my $state = load_javacg_static($filter_regex);
 
     return print_flow( $state, $start_regex, $opts{r} );
@@ -223,7 +269,6 @@ sub main {
 if ( !caller ) { main() }
 
 1;
-
 __END__
 
 =encoding utf8
@@ -327,7 +372,7 @@ Run the script with C<--help> to see the correct usage.
 
 The script couldn't print due to output error.
 
-=item * C<, so couldn't print the help message>
+=item * C<, so couldn't print the help message:>
 
 The script couldn't print the help message due to output error.
 
