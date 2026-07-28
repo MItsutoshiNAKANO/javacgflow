@@ -64,7 +64,6 @@ for depth in "${DEPTHS[@]}"; do
     data_file="$OUT_DIR/chain_${depth}.javacg-static"
     "$GEN" -s chain -d "$depth" >"$data_file"
 
-    measure "$ROOT_DIR/javacgflow_old.pl" "$depth" "$data_file" "recursive"
-    measure "$ROOT_DIR/javacgflow.pl" "$depth" "$data_file" \
-        "iterative"
+    measure "$ROOT_DIR/javacgflow_old.pl" "$depth" "$data_file" "old"
+    measure "$ROOT_DIR/javacgflow.pl" "$depth" "$data_file" "new"
 done
