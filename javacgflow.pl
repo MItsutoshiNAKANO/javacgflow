@@ -281,6 +281,22 @@ sub print_flow {
 }
 
 ##
+# Compile a user-supplied regex option string, or croak with a message
+# identifying which option was invalid.
+# @param[in] $label
+#   A human-readable name for the option, used in the error message
+#   (for example, 'start', 'filter', or 'exclude').
+# @param[in] $pattern The regex pattern string to compile.
+# @return A compiled Regexp object.
+sub compile_regex {
+    my ( $label, $pattern ) = @_;
+    my $regex;
+    eval { $regex = qr/$pattern/xms }
+        or croak "invalid $label regex: $pattern\n" . $EVAL_ERROR;
+    return $regex;
+}
+
+##
 # Main function to execute the script.
 # Parse command-line options using Getopt::Std.
 # @return 1 if the script executed successfully, otherwise croak.
@@ -289,35 +305,20 @@ sub main {
     ## The options are stored in the %opts hash.
     getopts( 'f:s:x:r', \my %opts ) or croak $help_message;
 
-    ## Compile the start and filter regexes if provided, and handle errors.
-    # The start regex is used to filter the starting methods for the call
-    # flow.
-    my $start_regex;
-    if ( defined $opts{s} ) {
-        eval { $start_regex = qr/$opts{s}/xms }
-            or croak 'invalid start regex: ' . $opts{s} . "\n" . $EVAL_ERROR;
-    }
-
-    ## Compile the filter regex if provided, and handle errors.
-    # The filter regex is used to filter the methods to be included in the
-    # output.
-    my $filter_regex;
-    if ( defined $opts{f} ) {
-        eval { $filter_regex = qr/$opts{f}/xms }
-            or croak 'invalid filter regex: ' . $opts{f} . "\n" . $EVAL_ERROR;
-    }
-
-    ## Compile the exclude regex if provided, and handle errors.
-    # The exclude regex is used to exclude callees from the call graph.
-    # If not provided, parse_call_line falls back to its default, which
+    ## Compile the start, filter, and exclude regexes if provided, and
+    # handle errors. The start regex filters the starting methods for the
+    # call flow; the filter regex filters the methods to be included in the
+    # output; the exclude regex excludes callees from the call graph and, if
+    # not provided, parse_call_line falls back to its default, which
     # excludes the java.* and javax.* packages.
-    my $exclude_regex;
-    if ( defined $opts{x} ) {
-        eval { $exclude_regex = qr/$opts{x}/xms }
-            or croak 'invalid exclude regex: '
-            . $opts{x} . "\n"
-            . $EVAL_ERROR;
-    }
+    my $start_regex
+        = defined $opts{s}
+        ? compile_regex( 'start', $opts{s} )
+        : undef;
+    my $filter_regex
+        = defined $opts{f} ? compile_regex( 'filter', $opts{f} ) : undef;
+    my $exclude_regex
+        = defined $opts{x} ? compile_regex( 'exclude', $opts{x} ) : undef;
 
     ## Load the javacg-static output and build the state of the call graph.
     # The state contains the edges, called, and reversed_edges hashes.
