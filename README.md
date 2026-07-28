@@ -8,6 +8,7 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     Options:
         -f REGEX Specify a filter regex.
         -s REGEX Specify the start method.
+        -x REGEX Specify a regex for callees to exclude.
         -r Print the flow from callee to caller (reverse direction).
         --help Print a brief help message and exit.
         --version Print the version number and exit.
@@ -48,6 +49,16 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     Only methods matching this regex will be used as starting points in the call
     graph.
 
+- `-x REGEX` Specify a regex for callees to exclude.
+
+    REGEX follows the same syntax rules as `-f REGEX`.
+    A method is excluded from the output whenever it appears as a callee and
+    matches REGEX, regardless of whether it also appears as a caller elsewhere.
+    Defaults to `\A javax?[.]`, which excludes the `java.*` and `javax.*`
+    packages.
+    Pass a REGEX that never matches (such as `(?!)`) to disable exclusion
+    entirely.
+
 - `-r` Print the flow from callee to caller (reverse direction).
 
     By default the flow is printed from caller to callee, starting from methods
@@ -80,6 +91,11 @@ Cflow-like text format.
 - `invalid start regex:`
 
     You specified an invalid start regex.
+    Run the script with `--help` to see the correct usage.
+
+- `invalid exclude regex:`
+
+    You specified an invalid exclude regex.
     Run the script with `--help` to see the correct usage.
 
 - `, so couldn't print the flow`

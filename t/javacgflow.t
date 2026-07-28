@@ -50,6 +50,7 @@ subtest 'HELP_MESSAGE' => sub {
     like( $out, qr/\AUsage:/xms,    'prints a usage line' );
     like( $out, qr/-f \s REGEX/xms, 'documents the -f option' );
     like( $out, qr/-s \s REGEX/xms, 'documents the -s option' );
+    like( $out, qr/-x \s REGEX/xms, 'documents the -x option' );
     like( $out, qr/-r \s Print/xms, 'documents the -r option' );
     return;
 };
@@ -75,6 +76,20 @@ subtest 'parse_call_line' => sub {
         = parse_call_line('M:pkg.A:foo() (M)javax.swing.JFrame:<init>()');
     is( scalar @javax_callee,
         0, 'filters out callees in the javax.* package' );
+
+    my @custom_excluded = parse_call_line( 'M:pkg.A:foo() (M)pkg.B:bar()',
+        qr/\A pkg[.]B/xms );
+    is( scalar @custom_excluded,
+        0, 'an explicit exclude_regex overrides the default' );
+
+    my @custom_kept
+        = parse_call_line( 'M:pkg.A:foo() (M)java.lang.String:valueOf()',
+            qr/\A pkg[.]B/xms );
+    is_deeply(
+        \@custom_kept,
+        [ 'pkg.A:foo()', 'java.lang.String:valueOf()' ],
+        'an explicit exclude_regex that does not match java.* lets it through'
+    );
 
     return;
 };
@@ -155,6 +170,21 @@ subtest 'load_javacg_static' => sub {
                 'pkg.B:bar()' => { 'pkg.C:baz()' => 1 },
             },
             'keeps only lines where the caller or callee matches the filter'
+        );
+        return;
+    };
+
+    subtest 'with an exclude regex' => sub {
+        local @ARGV = ($file);
+        my $state = load_javacg_static( undef, qr/\A pkg[.]C/xms );
+        is_deeply(
+            $state->{edges},
+            {   'pkg.A:foo()' => {
+                    'pkg.B:bar()'                => 1,
+                    'java.lang.String:valueOf()' => 2,
+                },
+            },
+            'an explicit exclude_regex replaces the default java.* exclusion'
         );
         return;
     };
@@ -285,6 +315,45 @@ subtest 'main (end to end, reverse)' => sub {
     return;
 };
 
+subtest 'main (end to end, exclude)' => sub {
+    my $file = fixture_file(
+        'M:pkg.A:foo() (M)pkg.B:bar()',
+        'M:pkg.A:foo() (M)java.lang.String:valueOf()',
+    );
+
+    subtest 'default: excludes java.* callees' => sub {
+        local @ARGV = ($file);
+        my $out = capture_stdout( sub { main() } );
+        is( $out,
+            "pkg.A:foo()\n  pkg.B:bar()\n",
+            'keeps the default java.* exclusion when -x is not given'
+        );
+        return;
+    };
+
+    subtest '-x overrides the default exclusion' => sub {
+        local @ARGV = ( '-x', 'pkg[.]B', $file );
+        my $out = capture_stdout( sub { main() } );
+        is( $out,
+            "pkg.A:foo()\n  java.lang.String:valueOf()\n",
+            'excludes callees matching the -x regex instead of java.*'
+        );
+        return;
+    };
+
+    subtest q{-x '(?!)' disables exclusion entirely} => sub {
+        local @ARGV = ( '-x', '(?!)', $file );
+        my $out = capture_stdout( sub { main() } );
+        is( $out,
+            "pkg.A:foo()\n  pkg.B:bar()\n  java.lang.String:valueOf()\n",
+            'a never-matching -x regex lets every callee through'
+        );
+        return;
+    };
+
+    return;
+};
+
 subtest 'main: error handling' => sub {
     my $file = fixture_file('M:pkg.A:foo() (M)pkg.B:bar()');
 
@@ -308,6 +377,18 @@ subtest 'main: error handling' => sub {
             $EVAL_ERROR,
             qr/\Ainvalid \s start \s regex:/xms,
             'dies with a diagnostic naming the bad -s regex'
+        );
+        return;
+    };
+
+    subtest 'invalid exclude regex' => sub {
+        local @ARGV = ( '-x', '(', $file );
+        my $ok = eval { main(); 1 };
+        ok( !$ok, 'main() dies' );
+        like(
+            $EVAL_ERROR,
+            qr/\Ainvalid \s exclude \s regex:/xms,
+            'dies with a diagnostic naming the bad -x regex'
         );
         return;
     };

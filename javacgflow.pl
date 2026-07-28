@@ -10,7 +10,7 @@ use Getopt::Std;
 # The version of this script.
 # This is used for the --version option.
 # @return The version string.
-our $VERSION = '0.1.1';
+our $VERSION = '0.2.0';
 
 ##
 # The help message string.
@@ -36,6 +36,11 @@ Options:
       REGEX modifiers are /xms by default, so you can use whitespace
       and comments in your regex, and the dot (.) matches any character.
     -s REGEX Specify the start method.
+    -x REGEX Specify a regex for callees to exclude.
+      A method is excluded from the output if it is called as a callee and
+      matches REGEX. REGEX follows the same syntax rules as the -f REGEX.
+      Defaults to \\A javax?[.], which excludes the java.* and javax.*
+      packages.
     -r Print the flow from callee to caller (reverse direction).
 example:
     java -jar javacg-static.jar TARGET.jar >TARGET.javacg-static
@@ -58,14 +63,18 @@ sub HELP_MESSAGE {
 ##
 # Parse a line of javacg-static output.
 # @param[in] $line A line string of javacg-static output.
+# @param[in] $exclude_regex
+#   An optional regex matching callees to exclude. Defaults to
+#   m/\A javax?[.]/xms, which excludes the java.* and javax.* packages.
 # @return
 #   ($caller, $callee)
 #   if the line represents a call, otherwise undef.
 sub parse_call_line {
-    my ($line) = @_;
+    my ( $line, $exclude_regex ) = @_;
+    $exclude_regex //= qr/\A javax?[.]/xms;
     if ( $line =~ /\A M:(\S+:\S+)\s+ [(].[)](\S+:\S+)/xms ) {
         my ( $caller, $callee ) = ( $1, $2 );
-        return if $callee =~ m/\A javax?[.]/xms;
+        return if $callee =~ $exclude_regex;
         return ( $caller, $callee );
     }
     return;
@@ -113,9 +122,12 @@ sub record_edge {
 # Load the javacg-static output and build the state.
 # @param[in] $filter_regex
 #   An optional regex to filter the methods to be included in the output.
+# @param[in] $exclude_regex
+#   An optional regex matching callees to exclude, passed through to
+#   parse_call_line.
 # @return A hash reference containing the state of the call graph.
 sub load_javacg_static {
-    my ($filter_regex) = @_;
+    my ( $filter_regex, $exclude_regex ) = @_;
     ## The state hash contains the edges, called, and reversed_edges hashes.
     # The edges hash stores the edges from caller to callee.
     # The called hash stores the count of times each method is called.
@@ -129,7 +141,7 @@ sub load_javacg_static {
     while (<>) {
         chomp;
         ## Parse the line and get the caller and callee methods.
-        my ( $caller, $callee ) = parse_call_line($_);
+        my ( $caller, $callee ) = parse_call_line( $_, $exclude_regex );
         next if !defined $caller;
         next
             if defined $filter_regex
@@ -234,7 +246,7 @@ sub print_flow {
 sub main {
     $Getopt::Std::STANDARD_HELP_VERSION = 1;
     ## The options are stored in the %opts hash.
-    getopts( 'f:s:r', \my %opts ) or croak $help_message;
+    getopts( 'f:s:x:r', \my %opts ) or croak $help_message;
 
     ## Compile the start and filter regexes if provided, and handle errors.
     # The start regex is used to filter the starting methods for the call
@@ -254,6 +266,18 @@ sub main {
             or croak 'invalid filter regex: ' . $opts{f} . "\n" . $EVAL_ERROR;
     }
 
+    ## Compile the exclude regex if provided, and handle errors.
+    # The exclude regex is used to exclude callees from the call graph.
+    # If not provided, parse_call_line falls back to its default, which
+    # excludes the java.* and javax.* packages.
+    my $exclude_regex;
+    if ( defined $opts{x} ) {
+        eval { $exclude_regex = qr/$opts{x}/xms }
+            or croak 'invalid exclude regex: '
+            . $opts{x} . "\n"
+            . $EVAL_ERROR;
+    }
+
     ## Load the javacg-static output and build the state of the call graph.
     # The state contains the edges, called, and reversed_edges hashes.
     # The edges hash stores the edges from caller to callee.
@@ -261,7 +285,7 @@ sub main {
     # The reversed_edges hash stores the edges from callee to caller.
     # The state is then used to print the call flow starting from the
     # specified methods.
-    my $state = load_javacg_static($filter_regex);
+    my $state = load_javacg_static( $filter_regex, $exclude_regex );
 
     return print_flow( $state, $start_regex, $opts{r} );
 }
@@ -283,6 +307,7 @@ javacgflow.pl - Convert Java call graph to Cflow-like text format
     Options:
         -f REGEX Specify a filter regex.
         -s REGEX Specify the start method.
+        -x REGEX Specify a regex for callees to exclude.
         -r Print the flow from callee to caller (reverse direction).
         --help Print a brief help message and exit.
         --version Print the version number and exit.
@@ -329,6 +354,16 @@ flow.
 Only methods matching this regex will be used as starting points in the call
 graph.
 
+=item * C<-x REGEX> Specify a regex for callees to exclude.
+
+REGEX follows the same syntax rules as C<-f REGEX>.
+A method is excluded from the output whenever it appears as a callee and
+matches REGEX, regardless of whether it also appears as a caller elsewhere.
+Defaults to C<\A javax?[.]>, which excludes the C<java.*> and C<javax.*>
+packages.
+Pass a REGEX that never matches (such as C<(?!)>) to disable exclusion
+entirely.
+
 =item * C<-r> Print the flow from callee to caller (reverse direction).
 
 By default the flow is printed from caller to callee, starting from methods
@@ -366,6 +401,11 @@ Run the script with C<--help> to see the correct usage.
 =item * C<invalid start regex:>
 
 You specified an invalid start regex.
+Run the script with C<--help> to see the correct usage.
+
+=item * C<invalid exclude regex:>
+
+You specified an invalid exclude regex.
 Run the script with C<--help> to see the correct usage.
 
 =item * C<, so couldn't print the flow>
