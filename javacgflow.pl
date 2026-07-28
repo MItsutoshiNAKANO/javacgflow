@@ -173,13 +173,13 @@ sub load_javacg_static {
 #   The starting method string in the format of javacg-static output.
 # @param[in] $depth
 #   The starting depth of the search, used for indentation.
-# @param[in,out] $visited
+# @param[in,out] $ancestors
 #   A hash reference tracking the ancestors on the current path, to detect
 #   recursion. Mutated while the traversal is in progress and restored to
 #   its original contents once it completes.
 # @return 1 if the flow was printed successfully, otherwise croak.
 sub depth_first_search {
-    my ( $edges, $method, $depth, $visited ) = @_;
+    my ( $edges, $method, $depth, $ancestors ) = @_;
 
     ## Each stack frame is a hash ref tracking one in-progress call:
     # - method, depth: the arguments the recursive call would have had.
@@ -196,14 +196,14 @@ sub depth_first_search {
         if ( !exists $frame->{children} ) {
             print q{  } x $frame->{depth} . $frame->{method}
                 or croak $OS_ERROR . q{, so couldn't print the flow};
-            if ( exists $visited->{ $frame->{method} } ) {
+            if ( exists $ancestors->{ $frame->{method} } ) {
                 say '(recursive)'
                     or croak $OS_ERROR . q{, so couldn't print the flow};
                 pop @stack;
                 next;
             }
             say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
-            $visited->{ $frame->{method} } = 1;
+            $ancestors->{ $frame->{method} } = 1;
             my $callee_seq = $edges->{ $frame->{method} };
             $frame->{children} = [
                 map  { $_->[0] }
@@ -222,7 +222,7 @@ sub depth_first_search {
                 };
         }
         else {
-            delete $visited->{ $frame->{method} };
+            delete $ancestors->{ $frame->{method} };
             pop @stack;
         }
     }
@@ -267,14 +267,14 @@ sub print_flow {
     }
 
     ## Print the call flow starting from each of the starting methods.
-    # Use a hash to track printed methods to avoid duplicate printing.
+    # Use a hash to track the ancestors on the current path, to detect
+    # recursion.
     foreach my $start (@starts) {
-        ## A hash to track printed methods to avoid duplicate printing.
-        # This is used to prevent printing the same method multiple times in
-        # the flow.
+        ## A hash tracking the ancestors on the current path, to detect
+        # recursion. See depth_first_search's $ancestors parameter.
         # The keys are the method strings, and the values are 1.
-        my %printed;
-        depth_first_search( $edges, $start, 0, \%printed );
+        my %ancestors;
+        depth_first_search( $edges, $start, 0, \%ancestors );
     }
     return 1;
 }
