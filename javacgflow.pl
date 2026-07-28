@@ -10,7 +10,7 @@ use Getopt::Std;
 # The version of this script.
 # This is used for the --version option.
 # @return The version string.
-our $VERSION = '0.2.0';
+our $VERSION = '0.2.1';
 
 ##
 # The help message string.
@@ -155,39 +155,69 @@ sub load_javacg_static {
 
 ##
 # Perform a depth-first search to print the call flow.
+# Uses an explicit stack of frames instead of native Perl recursion, so
+# traversal depth is bounded by heap memory rather than the C call stack.
 # @param[in] $edges
 #   A hash reference containing the edges of the call graph.
 # @param[in] $method
-#   The current method string in the format of javacg-static output.
+#   The starting method string in the format of javacg-static output.
 # @param[in] $depth
-#   The current depth of the search, used for indentation.
+#   The starting depth of the search, used for indentation.
 # @param[in,out] $visited
 #   A hash reference tracking the ancestors on the current path, to detect
-#   recursion. Mutated in place rather than copied, and restored to its
-#   original contents before returning.
-# @return
-#   The method string, possibly annotated with ' (recursive)' if recursion is
-#   detected.
+#   recursion. Mutated while the traversal is in progress and restored to
+#   its original contents once it completes.
+# @return 1 if the flow was printed successfully, otherwise croak.
 sub depth_first_search {
     my ( $edges, $method, $depth, $visited ) = @_;
-    print q{  } x $depth . $method
-        or croak $OS_ERROR . q{, so couldn't print the flow};
-    if ( exists $visited->{$method} ) {
-        say '(recursive)'
-            or croak $OS_ERROR . q{, so couldn't print the flow};
-        return $method . ' (recursive)';
+
+    ## Each stack frame is a hash ref tracking one in-progress call:
+    # - method, depth: the arguments the recursive call would have had.
+    # - children: this method's callees, sorted; filled in on the frame's
+    #   first visit, once we know method is not already an ancestor.
+    # - child_index: how many children have been pushed so far. Resuming a
+    #   frame at this index is what lets the loop pick up where a recursive
+    #   call would have returned to.
+    my @stack = ( { method => $method, depth => $depth, child_index => 0 } );
+
+    while (@stack) {
+        my $frame = $stack[-1];
+
+        if ( !exists $frame->{children} ) {
+            print q{  } x $frame->{depth} . $frame->{method}
+                or croak $OS_ERROR . q{, so couldn't print the flow};
+            if ( exists $visited->{ $frame->{method} } ) {
+                say '(recursive)'
+                    or croak $OS_ERROR . q{, so couldn't print the flow};
+                pop @stack;
+                next;
+            }
+            say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
+            ++$visited->{ $frame->{method} };
+            $frame->{children} = [
+                sort {
+                    $edges->{ $frame->{method} }{$a}
+                        <=> $edges->{ $frame->{method} }{$b}
+                    }
+                    keys %{ $edges->{ $frame->{method} } }
+            ];
+        }
+
+        if ( $frame->{child_index} < @{ $frame->{children} } ) {
+            my $next_method = $frame->{children}[ $frame->{child_index} ];
+            ++$frame->{child_index};
+            push @stack,
+                {   method      => $next_method,
+                    depth       => $frame->{depth} + 1,
+                    child_index => 0,
+                };
+        }
+        else {
+            delete $visited->{ $frame->{method} };
+            pop @stack;
+        }
     }
-    say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
-    ++$visited->{$method};
-    foreach my $next_method (
-        sort { $edges->{$method}{$a} <=> $edges->{$method}{$b} }
-        keys %{ $edges->{$method} }
-        )
-    {
-        depth_first_search( $edges, $next_method, $depth + 1, $visited );
-    }
-    delete $visited->{$method};
-    return $method;
+    return 1;
 }
 
 ##
