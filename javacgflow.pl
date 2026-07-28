@@ -99,6 +99,12 @@ sub parse_call_line {
 #     The keys are the callee method strings, and the values are hash
 #     references where the keys are the caller method strings and the values
 #     are the count of times the edge was recorded.
+#   - edge_seq: A hash reference of per-caller counters used to assign the
+#     next sequence number in edges, so it doesn't need to be recomputed by
+#     counting keys.
+#   - reversed_edge_seq: A hash reference of per-callee counters used to
+#     assign the next sequence number in reversed_edges, so it doesn't need
+#     to be recomputed by counting keys.
 # @param[in] $caller
 #   The caller method string in the format of javacg-static output.
 # @param[in] $callee
@@ -115,8 +121,8 @@ sub record_edge {
     if ( exists $edges->{$caller}{$callee} ) { return 0 }
     ++$called->{$callee};
     $reversed_edges->{$callee}{$caller}
-        = ( keys %{ $reversed_edges->{$callee} } ) + 1;
-    return $edges->{$caller}{$callee} = ( keys %{ $edges->{$caller} } ) + 1;
+        = ++$state->{reversed_edge_seq}{$callee};
+    return $edges->{$caller}{$callee} = ++$state->{edge_seq}{$caller};
 }
 
 ##
@@ -133,10 +139,14 @@ sub load_javacg_static {
     # The edges hash stores the edges from caller to callee.
     # The called hash stores the count of times each method is called.
     # The reversed_edges hash stores the edges from callee to caller.
+    # edge_seq and reversed_edge_seq are per-caller/per-callee counters used
+    # by record_edge to assign sequence numbers in O(1).
     my %state = (
-        edges          => {},
-        called         => {},
-        reversed_edges => {},
+        edges             => {},
+        called            => {},
+        reversed_edges    => {},
+        edge_seq          => {},
+        reversed_edge_seq => {},
     );
 
     while (<>) {
