@@ -204,12 +204,11 @@ sub depth_first_search {
             }
             say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
             ++$visited->{ $frame->{method} };
+            my $callee_seq = $edges->{ $frame->{method} };
             $frame->{children} = [
-                sort {
-                    $edges->{ $frame->{method} }{$a}
-                        <=> $edges->{ $frame->{method} }{$b}
-                    }
-                    keys %{ $edges->{ $frame->{method} } }
+                map  { $_->[0] }
+                sort { $a->[1] <=> $b->[1] }
+                map  { [ $_, $callee_seq->{$_} ] } keys %{$callee_seq}
             ];
         }
 
