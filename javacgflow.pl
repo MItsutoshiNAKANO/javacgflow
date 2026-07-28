@@ -203,7 +203,7 @@ sub depth_first_search {
                 next;
             }
             say q{} or croak $OS_ERROR . q{, so couldn't print the flow};
-            ++$visited->{ $frame->{method} };
+            $visited->{ $frame->{method} } = 1;
             my $callee_seq = $edges->{ $frame->{method} };
             $frame->{children} = [
                 map  { $_->[0] }
